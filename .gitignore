@@ -1,3 +1,25 @@
+# Build artifacts
 /target
+
+# Log files
 *.log
+logs/
+
+# Environment files (keep .env.example)
+.env
+.env.local
+.env.*.local
+
+# OS files
 .DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Banned IPs file (if it contains sensitive data)
+banned-ips.txt
