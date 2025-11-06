@@ -28,10 +28,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set lowercase image name
-        id: image-name
-        run: echo "IMAGE_NAME_LC=$(echo ${{ env.IMAGE_NAME }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -46,7 +42,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ steps.image-name.outputs.IMAGE_NAME_LC }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -56,79 +52,21 @@ jobs:
             type=sha
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build Docker image (normal version)
-        id: build
+      - name: Build and push Docker image
+        id: push
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
-          push: false
-          load: true
-          tags: ${{ env.REGISTRY }}/${{ steps.image-name.outputs.IMAGE_NAME_LC }}:build-${{ github.run_number }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Slim the Docker image
-        uses: kitabisa/docker-slim-action@v1
-        env:
-          DSLIM_HTTP_PROBE: false
-        with:
-          target: ${{ env.REGISTRY }}/${{ steps.image-name.outputs.IMAGE_NAME_LC }}:build-${{ github.run_number }}
-          tag: slim-build
-
-      - name: Tag images properly
-        run: |
-          # The slim action creates an image with .slim suffix on the repository name
-          # Tag the slim image
-          docker tag ${{ env.REGISTRY }}/${{ steps.image-name.outputs.IMAGE_NAME_LC }}.slim:latest \
-            ${{ env.REGISTRY }}/${{ steps.image-name.outputs.IMAGE_NAME_LC }}:slim-${{ github.run_number }}
-          
-          # List images to verify
-          echo "Available images:"
-          docker images | grep tezcatlipoca-auth
-
-      - name: Push normal version
-        id: push-normal
-        run: |
-          # Tag with all metadata tags
-          TAGS="${{ steps.meta.outputs.tags }}"
-          for tag in $TAGS; do
-            docker tag ${{ env.REGISTRY }}/${{ steps.image-name.outputs.IMAGE_NAME_LC }}:build-${{ github.run_number }} $tag
-            docker push $tag
-            echo "Pushed: $tag"
-          done
-          
-          # Get digest of the last pushed image
-          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.REGISTRY }}/${{ steps.image-name.outputs.IMAGE_NAME_LC }}:build-${{ github.run_number }} | cut -d'@' -f2)
-          echo "digest=$DIGEST" >> $GITHUB_OUTPUT
-
-      - name: Push slim version
-        id: push-slim
-        run: |
-          # Tag slim version with all metadata tags (adding -slim suffix)
-          TAGS="${{ steps.meta.outputs.tags }}"
-          for tag in $TAGS; do
-            slim_tag="${tag}-slim"
-            docker tag ${{ env.REGISTRY }}/${{ steps.image-name.outputs.IMAGE_NAME_LC }}:slim-${{ github.run_number }} $slim_tag
-            docker push $slim_tag
-            echo "Pushed: $slim_tag"
-          done
-          
-          # Get digest of the slim image
-          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.REGISTRY }}/${{ steps.image-name.outputs.IMAGE_NAME_LC }}:slim-${{ github.run_number }} | cut -d'@' -f2)
-          echo "digest=$DIGEST" >> $GITHUB_OUTPUT
-
-      - name: Generate artifact attestation (normal version)
+      - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v1
         with:
-          subject-name: ${{ env.REGISTRY }}/${{ steps.image-name.outputs.IMAGE_NAME_LC }}
-          subject-digest: ${{ steps.push-normal.outputs.digest }}
-          push-to-registry: true
-
-      - name: Generate artifact attestation (slim version)
-        uses: actions/attest-build-provenance@v1
-        with:
-          subject-name: ${{ env.REGISTRY }}/${{ steps.image-name.outputs.IMAGE_NAME_LC }}
-          subject-digest: ${{ steps.push-slim.outputs.digest }}
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
