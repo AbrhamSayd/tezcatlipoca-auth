@@ -2,8 +2,10 @@ use std::{
     collections::HashSet,
     time::{Duration, Instant},
 };
-use tokio::fs::{self, read_to_string};
+use tokio::{fs::{self, read_to_string}, time::sleep};
 use tracing::{warn, debug};
+
+use crate::AppState;
 
 
 pub struct BannedIpsCache {
@@ -49,4 +51,17 @@ async fn read_banned_ips(banned_ips_file: &str) -> std::io::Result<HashSet<Strin
        }
          Err(e) => Err(e),
    }
+}
+
+pub async fn cache_refresh_task(state: AppState) {
+    loop {
+        sleep(state.config.cache_ttl).await;
+        
+        let mut cache = state.banned_ips.write().await;
+        if cache.is_stale(state.config.cache_ttl) {
+            if let Err(e) = cache.refresh(&state.config.banned_ips_file).await {
+                warn!("Failed to refresh banned IPs cache: {}", e);
+            }
+        }
+    }
 }

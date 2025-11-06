@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  auth-middleware:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: traefik-auth-middleware-rust
+    restart: unless-stopped
+    ports:
+      - "8199:8199"
+    environment:
+      - BANNED_IPS_FILE=/app/banned-ips.txt
+      - CACHE_TTL_SECS=5
+      - LOG_FILE=/app/logs/traefik-auth.log
+      - PORT=8199
+      - RUST_LOG=info
+    volumes:
+      - ../banned-ips.txt:/app/banned-ips.txt:ro
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8199/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+  
+

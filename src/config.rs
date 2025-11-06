@@ -10,6 +10,7 @@ pub struct Config {
     pub log_rotation: LogRotation,
     pub log_max_files: usize,
     pub port: u16,
+    pub hostname: String,
 }
 
 /// Log rotation strategy
@@ -52,7 +53,10 @@ impl Config {
             .ok()
             .and_then(|s| s.parse::<usize>().ok())
             .unwrap_or(7);
-        
+
+        let hostname = env::var("HOSTNAME")
+            .unwrap_or_else(|_| "0.0.0.0".to_string());
+
         let port = env::var("PORT")
             .ok()
             .and_then(|s| s.parse::<u16>().ok())
@@ -66,6 +70,7 @@ impl Config {
             log_rotation,
             log_max_files,
             port,
+            hostname,
         }
     }
 }
@@ -80,6 +85,7 @@ impl Default for Config {
             log_rotation: LogRotation::Daily,
             log_max_files: 7,
             port: 8199,
+            hostname: "0.0.0.0".to_string(),
         }
     }
 }
