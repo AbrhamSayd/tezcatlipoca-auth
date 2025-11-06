@@ -25,6 +25,10 @@ jobs:
       id-token: write
 
     steps:
+      - name: Set lowercase repository name
+        run: |
+          echo "IMAGE_NAME=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+     
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -60,23 +64,23 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: |
-            ${{env.REGISTRY}}/${{github.repository}}:sha-${{github.sha}}
-            ${{env.REGISTRY}}/${{github.repository}}:branch-${{github.ref_name}}
-            ${{env.REGISTRY}}/${{github.repository}}:latest
+            ${{env.REGISTRY}}/${{env.IMAGE_NAME}}:sha-${{github.sha}}
+            ${{env.REGISTRY}}/${{env.IMAGE_NAME}}:branch-${{github.ref_name}}
+            ${{env.REGISTRY}}/${{env.IMAGE_NAME}}:latest
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Pull latest Docker image before slimming
-        run: docker pull  ${{env.REGISTRY}}/${{github.repository}}:latest
+        run: docker pull  ${{env.REGISTRY}}/${{env.IMAGE_NAME}}:latest
 
       - name: Slim image
         uses: kitabisa/docker-slim-action@v1
         env:
           DSLIM_HTTP_PROBE: false
         with:
-          target: ${{env.REGISTRY}}/${{github.repository}}:latest
+          target: ${{env.REGISTRY}}/${{env.IMAGE_NAME}}:latest
           tag: "slim"
 
       - name: Push slimmed Docker image
-        run: docker push  ${{env.REGISTRY}}/${{github.repository}}:slim
+        run: docker push  ${{env.REGISTRY}}/${{env.IMAGE_NAME}}:slim
