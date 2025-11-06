@@ -52,21 +52,68 @@ jobs:
             type=sha
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build and push Docker image
-        id: push
+      - name: Build Docker image (normal version)
+        id: build
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          push: false
+          load: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:build-${{ github.run_number }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Generate artifact attestation
+      - name: Slim the Docker image
+        uses: kitabisa/docker-slim-action@v1
+        env:
+          DSLIM_HTTP_PROBE: false
+        with:
+          target: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:build-${{ github.run_number }}
+          tag: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:slim-${{ github.run_number }}
+
+      - name: Push normal version
+        id: push-normal
+        run: |
+          # Tag with all metadata tags
+          TAGS="${{ steps.meta.outputs.tags }}"
+          for tag in $TAGS; do
+            docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:build-${{ github.run_number }} $tag
+            docker push $tag
+            echo "Pushed: $tag"
+          done
+          
+          # Get digest of the last pushed image
+          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:build-${{ github.run_number }} | cut -d'@' -f2)
+          echo "digest=$DIGEST" >> $GITHUB_OUTPUT
+
+      - name: Push slim version
+        id: push-slim
+        run: |
+          # Tag slim version with all metadata tags (adding -slim suffix)
+          TAGS="${{ steps.meta.outputs.tags }}"
+          for tag in $TAGS; do
+            slim_tag="${tag}-slim"
+            docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:slim-${{ github.run_number }} $slim_tag
+            docker push $slim_tag
+            echo "Pushed: $slim_tag"
+          done
+          
+          # Get digest of the slim image
+          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:slim-${{ github.run_number }} | cut -d'@' -f2)
+          echo "digest=$DIGEST" >> $GITHUB_OUTPUT
+
+      - name: Generate artifact attestation (normal version)
         uses: actions/attest-build-provenance@v1
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          subject-digest: ${{ steps.push.outputs.digest }}
+          subject-digest: ${{ steps.push-normal.outputs.digest }}
+          push-to-registry: true
+
+      - name: Generate artifact attestation (slim version)
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.push-slim.outputs.digest }}
           push-to-registry: true
