@@ -1,11 +1,11 @@
-name: Build and Publish Docker Image
+name: CD
 
 on:
   push:
     branches:
       - main
     tags:
-      - 'v*'
+      - "v*"
   pull_request:
     branches:
       - main
@@ -23,7 +23,7 @@ jobs:
       packages: write
       attestations: write
       id-token: write
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -54,19 +54,29 @@ jobs:
 
       - name: Build and push Docker image
         id: push
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: |
+            ${{env.REGISTRY}}/${{github.repository}}:sha-${{github.sha}}
+            ${{env.REGISTRY}}/${{github.repository}}:branch-${{github.ref_name}}
+            ${{env.REGISTRY}}/${{github.repository}}:latest
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v1
+      - name: Pull latest Docker image before slimming
+        run: docker pull  ${{env.REGISTRY}}/${{github.repository}}:latest
+
+      - name: Slim image
+        uses: kitabisa/docker-slim-action@v1
+        env:
+          DSLIM_HTTP_PROBE: false
         with:
-          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          subject-digest: ${{ steps.push.outputs.digest }}
-          push-to-registry: true
+          target: ${{env.REGISTRY}}/${{github.repository}}:latest
+          tag: "slim"
+
+      - name: Push slimmed Docker image
+        run: docker push  ${{env.REGISTRY}}/${{github.repository}}:slim
