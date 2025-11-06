@@ -1,0 +1,14 @@
+# Example banned IPs file
+# One IP address per line
+# Lines starting with # are comments
+
+# Example IPs
+192.168.1.100
+10.0.0.50
+172.16.0.200
+
+# You can add entire ranges using CIDR notation if supported
+# Or list individual IPs
+
+# Known malicious IPs
+# Add your banned IPs below

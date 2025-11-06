@@ -52,7 +52,7 @@ impl Config {
             .and_then(|s| s.parse::<usize>().ok())
             .unwrap_or(7);
 
-        let hostname = env::var("HOSTNAME").unwrap_or_else(|_| "0.0.0.0".to_string());
+        let hostname = env::var("APP_HOSTNAME").unwrap_or_else(|_| "0.0.0.0".to_string());
 
         let port = env::var("PORT")
             .ok()

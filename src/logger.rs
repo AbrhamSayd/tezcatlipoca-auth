@@ -55,9 +55,9 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 /// RUST_LOG=info,tezcatlipoca_auth::controllers=debug cargo run
 /// ```
 ///
-/// # Panics
-/// Panics if the log file appender cannot be created (e.g., permission issues)
-pub fn setup_logging(config: &Config) {
+/// # Errors
+/// Returns an error if the log file appender cannot be created (e.g., permission issues)
+pub fn setup_logging(config: &Config) -> Result<(), Box<dyn std::error::Error>> {
     // Parse log file name (remove path and extension)
     let log_path = Path::new(&config.log_file);
     let log_prefix = log_path
@@ -84,7 +84,12 @@ pub fn setup_logging(config: &Config) {
         .filename_suffix(log_suffix)
         .max_log_files(config.log_max_files)
         .build(&config.log_dir)
-        .expect("Failed to create log file appender");
+        .map_err(|e| {
+            eprintln!("ERROR: Failed to create log file appender at directory '{}': {}", config.log_dir, e);
+            eprintln!("  Log file would be: {}/{}.{}", config.log_dir, log_prefix, log_suffix);
+            eprintln!("  Make sure the directory exists and has write permissions");
+            e
+        })?;
 
     let file_layer = tracing_subscriber::fmt::layer()
         .with_writer(file_appender)
@@ -109,4 +114,6 @@ pub fn setup_logging(config: &Config) {
         .with(file_layer)
         .with(console_layer)
         .init();
+
+    Ok(())
 }

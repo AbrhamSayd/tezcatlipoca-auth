@@ -12,11 +12,13 @@ services:
     environment:
       - BANNED_IPS_FILE=/app/banned-ips.txt
       - CACHE_TTL_SECS=5
-      - LOG_FILE=/app/logs/traefik-auth.log
+      - LOG_FILE=traefik-auth.log
+      - LOG_DIR=/app/logs
       - PORT=8199
+      - APP_HOSTNAME=0.0.0.0
       - RUST_LOG=info
     volumes:
-      - ../banned-ips.txt:/app/banned-ips.txt:ro
+      - ./banned-ips.txt:/app/banned-ips.txt:ro
       - ./logs:/app/logs
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8199/health"]

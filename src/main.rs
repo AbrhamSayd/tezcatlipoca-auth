@@ -64,13 +64,33 @@ struct AppState {
 /// - If the server fails to start
 #[tokio::main]
 async fn main() {
+    // Set up panic hook to catch and log panics
+    std::panic::set_hook(Box::new(|panic_info| {
+        eprintln!("PANIC: Application panicked!");
+        if let Some(s) = panic_info.payload().downcast_ref::<&str>() {
+            eprintln!("Panic message: {}", s);
+        } else if let Some(s) = panic_info.payload().downcast_ref::<String>() {
+            eprintln!("Panic message: {}", s);
+        }
+        if let Some(location) = panic_info.location() {
+            eprintln!("Panic occurred at {}:{}:{}", location.file(), location.line(), location.column());
+        }
+    }));
+
+    if let Err(e) = run().await {
+        eprintln!("Fatal error: {}", e);
+        std::process::exit(1);
+    }
+}
+
+async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // Load .env file if present (fails silently if not found)
     dotenvy::dotenv().ok();
 
     let config = Config::from_env();
 
     //setup loggin
-    setup_logging(&config);
+    setup_logging(&config).map_err(|e| format!("Failed to setup logging: {}", e))?;
 
     info!("Configuration loaded:");
     info!("  Banned IPs file: {}", config.banned_ips_file);
@@ -115,7 +135,9 @@ async fn main() {
     info!("Starting server on {}", addr);
     let listener = TcpListener::bind(&addr)
         .await
-        .expect("Failed to bind address");
+        .map_err(|e| format!("Failed to bind to {}: {}", addr, e))?;
+    
+    info!("Server successfully bound to {}", addr);
     
     // Use into_make_service_with_connect_info to access socket address
     axum::serve(
@@ -123,5 +145,7 @@ async fn main() {
         app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
     )
     .await
-    .expect("Server failed");
+    .map_err(|e| format!("Server failed: {}", e))?;
+
+    Ok(())
 }
