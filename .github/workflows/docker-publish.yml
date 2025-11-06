@@ -83,13 +83,13 @@ jobs:
           # Tag with all metadata tags
           TAGS="${{ steps.meta.outputs.tags }}"
           for tag in $TAGS; do
-            docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:build-${{ github.run_number }} $tag
+            docker tag ${{ env.REGISTRY }}/${{ steps.image-name.outputs.IMAGE_NAME_LC }}:build-${{ github.run_number }} $tag
             docker push $tag
             echo "Pushed: $tag"
           done
           
           # Get digest of the last pushed image
-          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:build-${{ github.run_number }} | cut -d'@' -f2)
+          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.REGISTRY }}/${{ steps.image-name.outputs.IMAGE_NAME_LC }}:build-${{ github.run_number }} | cut -d'@' -f2)
           echo "digest=$DIGEST" >> $GITHUB_OUTPUT
 
       - name: Push slim version
@@ -99,25 +99,25 @@ jobs:
           TAGS="${{ steps.meta.outputs.tags }}"
           for tag in $TAGS; do
             slim_tag="${tag}-slim"
-            docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:slim-${{ github.run_number }} $slim_tag
+            docker tag ${{ env.REGISTRY }}/${{ steps.image-name.outputs.IMAGE_NAME_LC }}:slim-${{ github.run_number }} $slim_tag
             docker push $slim_tag
             echo "Pushed: $slim_tag"
           done
           
           # Get digest of the slim image
-          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:slim-${{ github.run_number }} | cut -d'@' -f2)
+          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.REGISTRY }}/${{ steps.image-name.outputs.IMAGE_NAME_LC }}:slim-${{ github.run_number }} | cut -d'@' -f2)
           echo "digest=$DIGEST" >> $GITHUB_OUTPUT
 
       - name: Generate artifact attestation (normal version)
         uses: actions/attest-build-provenance@v1
         with:
-          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-name: ${{ env.REGISTRY }}/${{ steps.image-name.outputs.IMAGE_NAME_LC }}
           subject-digest: ${{ steps.push-normal.outputs.digest }}
           push-to-registry: true
 
       - name: Generate artifact attestation (slim version)
         uses: actions/attest-build-provenance@v1
         with:
-          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-name: ${{ env.REGISTRY }}/${{ steps.image-name.outputs.IMAGE_NAME_LC }}
           subject-digest: ${{ steps.push-slim.outputs.digest }}
           push-to-registry: true
