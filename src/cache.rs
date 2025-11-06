@@ -2,11 +2,13 @@ use std::{
     collections::HashSet,
     time::{Duration, Instant},
 };
-use tokio::{fs::{self, read_to_string}, time::sleep};
-use tracing::{warn, debug};
+use tokio::{
+    fs,
+    time::sleep,
+};
+use tracing::{debug, warn};
 
 use crate::AppState;
-
 
 pub struct BannedIpsCache {
     pub ips: HashSet<String>,
@@ -26,8 +28,8 @@ impl BannedIpsCache {
     }
 
     pub async fn refresh(&mut self, banned_ips_file: &str) -> std::io::Result<()> {
-        let content = read_to_string(banned_ips_file).await?;
-        self.ips = content.lines().map(|line| line.trim().to_string()).collect();
+        let content = read_banned_ips(banned_ips_file).await?;
+        self.ips = content;
         self.last_read = Instant::now();
         debug!("Banned IPs cache refreshed with {} entries", self.ips.len());
         Ok(())
@@ -38,25 +40,27 @@ impl BannedIpsCache {
     }
 }
 
-
 async fn read_banned_ips(banned_ips_file: &str) -> std::io::Result<HashSet<String>> {
-   match fs::read_to_string(banned_ips_file).await {
-       Ok(content) => {
-           let ips: HashSet<String> = content.lines().map(|line| line.trim().to_string()).collect();
-           Ok(ips)
-       }
-       Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-           warn!("Banned IPs file not found: {}", banned_ips_file);
-           Ok(HashSet::new())
-       }
-         Err(e) => Err(e),
-   }
+    match fs::read_to_string(banned_ips_file).await {
+        Ok(content) => {
+            let ips: HashSet<String> = content
+                .lines()
+                .map(|line| line.trim().to_string())
+                .collect();
+            Ok(ips)
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            warn!("Banned IPs file not found: {}", banned_ips_file);
+            Ok(HashSet::new())
+        }
+        Err(e) => Err(e),
+    }
 }
 
 pub async fn cache_refresh_task(state: AppState) {
     loop {
         sleep(state.config.cache_ttl).await;
-        
+
         let mut cache = state.banned_ips.write().await;
         if cache.is_stale(state.config.cache_ttl) {
             if let Err(e) = cache.refresh(&state.config.banned_ips_file).await {

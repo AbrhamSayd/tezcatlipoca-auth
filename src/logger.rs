@@ -1,10 +1,62 @@
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use tracing_subscriber::filter::EnvFilter;
-use tracing_appender::rolling::{RollingFileAppender, Rotation};
-use std::path::Path;
-use crate::config::{Config, LogRotation};
+//! Logging configuration and setup.
+//!
+//! This module configures the tracing subscriber with both file and console output,
+//! including log rotation and environment-based log level filtering.
 
-/// Sets up logging with file rotation and console output
+use crate::config::{Config, LogRotation};
+use std::path::Path;
+use tracing_appender::rolling::{RollingFileAppender, Rotation};
+use tracing_subscriber::filter::EnvFilter;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+/// Sets up logging with file rotation and console output.
+///
+/// Configures a tracing subscriber with:
+/// - File output with configurable rotation (hourly, daily, or never)
+/// - Console output to stdout
+/// - Log level filtering via `RUST_LOG` environment variable (defaults to "info")
+/// - Automatic log file management with maximum file retention
+///
+/// # Arguments
+/// * `config` - Configuration containing log file settings
+///
+/// # Log File Naming
+/// The log files are created based on the configured log_file path:
+/// - Prefix: Filename without extension (e.g., "traefik-auth" from "traefik-auth.log")
+/// - Suffix: File extension (e.g., "log")
+/// - Rotation files are automatically named with timestamps
+///
+/// # Environment Variables for Log Levels
+/// Set `RUST_LOG` to control log verbosity. Examples:
+/// - `RUST_LOG=trace` - Most verbose, shows all logs
+/// - `RUST_LOG=debug` - Debug and above (debug, info, warn, error)
+/// - `RUST_LOG=info` - Info and above (default)
+/// - `RUST_LOG=warn` - Warnings and errors only
+/// - `RUST_LOG=error` - Errors only
+///
+/// ## Advanced Filtering
+/// You can filter by module or target:
+/// - `RUST_LOG=tezcatlipoca_auth=debug` - Debug level for this crate only
+/// - `RUST_LOG=info,tezcatlipoca_auth::cache=debug` - Info globally, debug for cache module
+/// - `RUST_LOG=warn,tezcatlipoca_auth::controllers=trace` - Warn globally, trace for controllers
+///
+/// # Example Usage
+/// ```bash
+/// # Show all info, warn, and error logs
+/// RUST_LOG=info cargo run
+///
+/// # Debug mode for troubleshooting
+/// RUST_LOG=debug cargo run
+///
+/// # Only show warnings and errors
+/// RUST_LOG=warn cargo run
+///
+/// # Fine-grained control
+/// RUST_LOG=info,tezcatlipoca_auth::controllers=debug cargo run
+/// ```
+///
+/// # Panics
+/// Panics if the log file appender cannot be created (e.g., permission issues)
 pub fn setup_logging(config: &Config) {
     // Parse log file name (remove path and extension)
     let log_path = Path::new(&config.log_file);
@@ -12,7 +64,7 @@ pub fn setup_logging(config: &Config) {
         .file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or("traefik-auth");
-    
+
     let log_suffix = log_path
         .extension()
         .and_then(|s| s.to_str())
@@ -43,11 +95,17 @@ pub fn setup_logging(config: &Config) {
         .with_writer(std::io::stdout)
         .with_target(false);
 
+    // Build EnvFilter with fallback to config or "info"
+    // Priority: RUST_LOG env var > explicit config > "info" default
+    let env_filter = EnvFilter::try_from_default_env()
+        .or_else(|_| EnvFilter::try_new("info"))
+        .unwrap_or_else(|_| {
+            // Fallback if both fail (shouldn't happen with "info")
+            EnvFilter::new("info")
+        });
+
     tracing_subscriber::registry()
-        .with(
-            EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::new("info")),
-        )
+        .with(env_filter)
         .with(file_layer)
         .with(console_layer)
         .init();

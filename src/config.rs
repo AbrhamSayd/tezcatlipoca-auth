@@ -24,20 +24,18 @@ pub enum LogRotation {
 impl Config {
     /// Load configuration from environment variables with defaults
     pub fn from_env() -> Self {
-        let banned_ips_file = env::var("BANNED_IPS_FILE")
-            .unwrap_or_else(|_| "./banned-ips.txt".to_string());
-        
+        let banned_ips_file =
+            env::var("BANNED_IPS_FILE").unwrap_or_else(|_| "./banned-ips.txt".to_string());
+
         let cache_ttl_secs = env::var("CACHE_TTL_SECS")
             .ok()
             .and_then(|s| s.parse::<u64>().ok())
             .unwrap_or(5);
-        
-        let log_file = env::var("LOG_FILE")
-            .unwrap_or_else(|_| "./traefik-auth.log".to_string());
-        
-        let log_dir = env::var("LOG_DIR")
-            .unwrap_or_else(|_| ".".to_string());
-        
+
+        let log_file = env::var("LOG_FILE").unwrap_or_else(|_| "./traefik-auth.log".to_string());
+
+        let log_dir = env::var("LOG_DIR").unwrap_or_else(|_| ".".to_string());
+
         let log_rotation = match env::var("LOG_ROTATION")
             .unwrap_or_else(|_| "daily".to_string())
             .to_lowercase()
@@ -48,14 +46,13 @@ impl Config {
             "never" => LogRotation::Never,
             _ => LogRotation::Daily,
         };
-        
+
         let log_max_files = env::var("LOG_MAX_FILES")
             .ok()
             .and_then(|s| s.parse::<usize>().ok())
             .unwrap_or(7);
 
-        let hostname = env::var("HOSTNAME")
-            .unwrap_or_else(|_| "0.0.0.0".to_string());
+        let hostname = env::var("HOSTNAME").unwrap_or_else(|_| "0.0.0.0".to_string());
 
         let port = env::var("PORT")
             .ok()
