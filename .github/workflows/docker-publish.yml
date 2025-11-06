@@ -75,7 +75,13 @@ jobs:
           DSLIM_HTTP_PROBE: false
         with:
           target: ${{ env.REGISTRY }}/${{ steps.image-name.outputs.IMAGE_NAME_LC }}:build-${{ github.run_number }}
-          tag: ${{ env.REGISTRY }}/${{ steps.image-name.outputs.IMAGE_NAME_LC }}:slim-${{ github.run_number }}
+          tag: slim-${{ github.run_number }}
+          overwrite: true
+
+      - name: Tag slim image properly
+        run: |
+          docker tag ${{ env.REGISTRY }}/${{ steps.image-name.outputs.IMAGE_NAME_LC }}:build-${{ github.run_number }}.slim \
+            ${{ env.REGISTRY }}/${{ steps.image-name.outputs.IMAGE_NAME_LC }}:slim-${{ github.run_number }}
 
       - name: Push normal version
         id: push-normal
