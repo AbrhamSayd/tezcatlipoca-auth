@@ -75,13 +75,18 @@ jobs:
           DSLIM_HTTP_PROBE: false
         with:
           target: ${{ env.REGISTRY }}/${{ steps.image-name.outputs.IMAGE_NAME_LC }}:build-${{ github.run_number }}
-          tag: slim-${{ github.run_number }}
-          overwrite: true
+          tag: slim-build
 
-      - name: Tag slim image properly
+      - name: Tag images properly
         run: |
-          docker tag ${{ env.REGISTRY }}/${{ steps.image-name.outputs.IMAGE_NAME_LC }}:build-${{ github.run_number }}.slim \
+          # The slim action creates an image with .slim suffix on the repository name
+          # Tag the slim image
+          docker tag ${{ env.REGISTRY }}/${{ steps.image-name.outputs.IMAGE_NAME_LC }}.slim:latest \
             ${{ env.REGISTRY }}/${{ steps.image-name.outputs.IMAGE_NAME_LC }}:slim-${{ github.run_number }}
+          
+          # List images to verify
+          echo "Available images:"
+          docker images | grep tezcatlipoca-auth
 
       - name: Push normal version
         id: push-normal
