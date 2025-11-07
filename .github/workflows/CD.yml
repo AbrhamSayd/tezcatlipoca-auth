@@ -2,13 +2,10 @@ name: CD
 
 on:
   push:
-    branches:
-      - main
-    tags:
-      - "v*"
+    branches: [main]
+    tags: ["v*"]
   pull_request:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 env:
@@ -18,9 +15,6 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        architecture: [amd64, arm64]
     permissions:
       contents: read
       packages: write
@@ -29,9 +23,8 @@ jobs:
 
     steps:
       - name: Set lowercase repository name
-        run: |
-          echo "IMAGE_NAME=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
-     
+        run: echo "IMAGE_NAME=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -45,21 +38,20 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels) for Docker
+      - name: Extract metadata (tags, labels)
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=ref,event=branch
-            type=ref,event=pr
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
             type=sha
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build and push Docker image
+      - name: Build and push multi-arch Docker image
         id: push
         uses: docker/build-push-action@v6
         with:
@@ -73,18 +65,18 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          platforms: linux/amd64,linux/arm64  
+          platforms: linux/amd64,linux/arm64
 
       - name: Pull latest Docker image before slimming
-        run: docker pull  ${{env.REGISTRY}}/${{env.IMAGE_NAME}}:latest
+        run: docker pull ${{env.REGISTRY}}/${{env.IMAGE_NAME}}:latest
 
-      - name: Slim image
+      - name: Slim image (disable HTTP probe)
         uses: kitabisa/docker-slim-action@v1
         env:
           DSLIM_HTTP_PROBE: false
         with:
           target: ${{env.REGISTRY}}/${{env.IMAGE_NAME}}:latest
-          tag: "slim"
+          tag: slim
 
-      - name: Push slimmed Docker image
-        run: docker push  ${{env.REGISTRY}}/${{env.IMAGE_NAME}}:slim
+      - name: Push slimmed image
+        run: docker push ${{env.REGISTRY}}/${{env.IMAGE_NAME}}:slim
