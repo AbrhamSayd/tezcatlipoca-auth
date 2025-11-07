@@ -6,12 +6,6 @@ WORKDIR /app
 # Copy manifests
 COPY Cargo.toml Cargo.lock* ./
 
-# Create a dummy main.rs to cache dependencies
-RUN mkdir src && \
-    echo "fn main() {}" > src/main.rs && \
-    cargo build --release && \
-    rm -rf src
-
 # Copy actual source code
 COPY src ./src
 
@@ -29,7 +23,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy the binary from builder
-COPY --from=builder /app/target/release/tezcatlipoca-auth /app/tezcatlipoca-auth
+COPY --from=builder /app/target/release/ /app/tezcatlipoca-auth
 
 # Create directory for logs
 RUN mkdir -p /app/logs
@@ -38,4 +32,4 @@ RUN mkdir -p /app/logs
 EXPOSE 8199
 
 # Run the application
-CMD ["/app/tezcatlipoca-auth"]
+CMD ["/app/tezcatlipoca-auth/tezcatlipoca-auth"]
